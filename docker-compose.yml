@@ -1,0 +1,8 @@
+rabbit1:
+  image: rabbitmq
+  hostname: rabbit1
+  ports:
+    - "5672:5672"
+  environment:
+    RABBITMQ_ERLANG_COOKIE: asdfasdf
+

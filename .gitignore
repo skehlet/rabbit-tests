@@ -1,0 +1,6 @@
+
+*.jar
+
+rabbitmq-java-client-bin-3.6.0.tar.gz
+
+*.class
