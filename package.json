@@ -1,0 +1,22 @@
+{
+  "name": "rabbit-tests",
+  "version": "1.0.0",
+  "description": "docker-compose up -d",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/skehlet/rabbit-tests.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/skehlet/rabbit-tests/issues"
+  },
+  "homepage": "https://github.com/skehlet/rabbit-tests",
+  "dependencies": {
+    "amqplib": "*"
+  }
+}
