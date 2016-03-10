@@ -1,0 +1,90 @@
+var amqplib = require('amqplib');
+var nodeUuid = require('node-uuid');
+var Promise = require('bluebird');
+var EventEmitter = require("events").EventEmitter;
+
+var EXCHANGE_NAME = 'stevek';
+var connection;
+var channel;
+var privateQueue;
+var ee = new EventEmitter();
+var isInitializing = false;
+
+module.exports = {
+    rpc: rpc
+};
+
+function getChannel() {
+    if (channel) {
+        return Promise.resolve(channel);
+    }
+
+    if (!isInitializing) {
+        isInitializing = true;
+        return Promise.try(function () {
+            console.log('establishing rabbit connection, channel, and exchange');
+            return amqplib.connect('amqp://localhost').then(function (conn) {
+                connection = conn;
+                return connection.createChannel();
+            }).tap(function (ch) {
+                channel = ch;
+                return ch.assertExchange(EXCHANGE_NAME, 'topic', {});
+            }).tap(function (ch) {
+                return ch.assertQueue('', {exclusive: true}).then(function (q) {
+                    privateQueue = q;
+                    console.log('private q established:', q.queue);
+
+                    ch.consume(
+                        q.queue,
+                        function (msg) {
+                            console.log('emitting results for', msg.properties.correlationId);
+                            ee.emit(msg.properties.correlationId, JSON.parse(msg.content.toString()));
+                        },
+                        {
+                            noAck: true
+                        }
+                    );
+
+                });
+            }).then(function (ch) {
+                ee.emit('rabbit', ch);
+                return ch;
+            });
+        });
+
+    } else {
+        return new Promise(function (resolve, reject) {
+            ee.once('rabbit', resolve);
+        });
+    }
+}
+
+
+
+
+function rpc(name /*, ...*/) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+        var correlationId = nodeUuid();
+        getChannel().then(function(ch) {
+            console.log('Calling RPC', name, 'args:', args);
+            ee.once(correlationId, function (results) {
+                console.log(correlationId, 'handler received:', results);
+                resolve(results);
+            });
+
+            ch.publish(
+                EXCHANGE_NAME,
+                name,
+                new Buffer(JSON.stringify(args)),
+                {
+                    correlationId: correlationId,
+                    replyTo: privateQueue.queue
+                }
+            );
+
+            console.log('awaiting response for request', correlationId);
+        });
+
+    });
+}
