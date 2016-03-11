@@ -1,15 +1,4 @@
-//mirthAmqp.publish([publishTopicName], message, {
-//    correlationId: correlationId
-//}).catch(function (err) {
-//    logger.error(err);
-//    mirthAmqp.revokeData(correlationId);
-//    throw err;
-//});
-
-
-//var amqplib = require('amqplib');
-//var Promise = require('bluebird');
-//var _ = require('lodash');
+#!/usr/bin/env node
 
 var rabbit_rpc = require('./rabbit_rpc');
 
@@ -21,4 +10,7 @@ promises.push(rabbit_rpc.rpc('fib', 30));
 promises.push(rabbit_rpc.rpc('fib', 15));
 Promise.all(promises).then(function(results) {
     console.log('results', results);
+    process.exit(0);
+}).catch(function(err) {
+    console.log('Caught error:', err);
 });

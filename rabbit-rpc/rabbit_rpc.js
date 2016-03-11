@@ -1,83 +1,69 @@
 var amqplib = require('amqplib');
 var nodeUuid = require('node-uuid');
 var Promise = require('bluebird');
-var EventEmitter = require("events").EventEmitter;
+var EventEmitter = require('events').EventEmitter;
+var logger = require('log4js').getLogger(module.filename);
 
 var EXCHANGE_NAME = 'stevek';
-var connection;
-var channel;
-var privateQueue;
 var ee = new EventEmitter();
-var initPromise;
+var rabbit;
 
 module.exports = {
     rpc: rpc
 };
 
-function init() {
-    initPromise = Promise.try(function () {
-        console.log('establishing rabbit connection, channel, and exchange');
-        return amqplib.connect('amqp://localhost').then(function (conn) {
-            connection = conn;
-            return connection.createChannel();
-        }).tap(function (ch) {
-            channel = ch;
-            return ch.assertExchange(EXCHANGE_NAME, 'topic', {});
-        }).tap(function (ch) {
-            return ch.assertQueue('', {exclusive: true}).then(function (q) {
-                privateQueue = q;
-                console.log('private q established:', q.queue);
+function responseConsumer(message) {
+    var obj;
+    try {
+        obj = JSON.parse(message.content.toString());
+    } catch (err) {
+        obj = err;
+    }
+    logger.debug('[' + message.properties.correlationId + '] ->', obj);
+    ee.emit(message.properties.correlationId, obj);
+}
 
-                ch.consume(
-                    q.queue,
-                    function (msg) {
-                        console.log('emitting results for', msg.properties.correlationId);
-                        ee.emit(msg.properties.correlationId, JSON.parse(msg.content.toString()));
-                    },
-                    {
-                        noAck: true
-                    }
-                );
-
+function initRabbit() {
+    logger.debug('establishing rabbit connection, channel, exchange, and responseQueue');
+    return amqplib.connect('amqp://localhost').then(function (connection) {
+        return connection.createChannel().then(function (channel) {
+            return channel.assertExchange(EXCHANGE_NAME, 'topic', {}).then(function (exchange) {
+                return channel.assertQueue('', {exclusive: true}).then(function (responseQueue) {
+                    channel.consume(responseQueue.queue, responseConsumer);
+                    return [connection, channel, exchange, responseQueue];
+                });
             });
-        }).then(function (ch) {
-            ee.emit('rabbit', ch);
-            return ch;
         });
     });
 }
 
-function getChannel() {
-    if (!initPromise) {
-        init();
+function getRabbit() {
+    if (!rabbit) {
+        rabbit = initRabbit();
     }
-    return initPromise;
+    return rabbit;
 }
 
+function publishToRabbit(correlationId, name, args) {
+    logger.debug('[' + correlationId + ']', name + '(' + args.join(', ')  + ') ->');
+    return getRabbit().spread(function(connection, channel, exchange, responseQueue) {
+        return channel.publish(exchange.exchange, name, new Buffer(JSON.stringify(args)), {
+            correlationId: correlationId,
+            replyTo: responseQueue.queue
+        });
+    });
+}
 
+/**
+ * Perform an RPC call to a remote function.
+ * @param name {String} Required. The routing key.
+ * @returns A promise that is resolved with the results.
+ */
 function rpc(name /*, ...*/) {
     var args = Array.prototype.slice.call(arguments, 1);
     return new Promise(function (resolve, reject) {
         var correlationId = nodeUuid();
-        getChannel().then(function(ch) {
-            console.log('Calling RPC', name, 'args:', args);
-            ee.once(correlationId, function (results) {
-                console.log(correlationId, 'handler received:', results);
-                resolve(results);
-            });
-
-            ch.publish(
-                EXCHANGE_NAME,
-                name,
-                new Buffer(JSON.stringify(args)),
-                {
-                    correlationId: correlationId,
-                    replyTo: privateQueue.queue
-                }
-            );
-
-            console.log('awaiting response for request', correlationId);
-        });
-
+        ee.once(correlationId, resolve);
+        publishToRabbit(correlationId, name, args).catch(reject);
     });
 }

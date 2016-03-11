@@ -8,7 +8,7 @@ amqp.connect('amqp://localhost')
             .then(function(ch) {
                 var ex = 'stevek';
                 ch.assertExchange(ex, 'topic');
-                ch.assertQueue('', {exclusive: true}).then(function (q) {
+                ch.assertQueue('fib_queue').then(function (q) {
                     console.log('private q:', q);
                     ch.bindQueue(q.queue, ex, 'fib');
                     ch.prefetch(1);

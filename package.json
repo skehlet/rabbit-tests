@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/skehlet/rabbit-tests",
   "dependencies": {
-    "amqplib": "*"
+    "amqplib": "*",
+    "log4js": "^0.6.33"
   }
 }
