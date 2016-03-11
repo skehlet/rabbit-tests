@@ -7,7 +7,7 @@ var logger = require('log4js').getLogger(module.filename);
 var EXCHANGE_NAME = 'stevek';
 var ee = new EventEmitter();
 var rabbit;
-var RPC_TIMEOUT = 10 * 1000;
+var RPC_TIMEOUT = 10 * 1000; // 10sec
 
 module.exports = {
     rpc: rpc
@@ -25,16 +25,20 @@ function responseConsumer(message) {
 
 function initRabbit() {
     logger.debug('establishing rabbit connection, channel, exchange, and responseQueue');
-    return amqplib.connect('amqp://localhost').then(function (connection) {
-        return connection.createChannel().then(function (channel) {
-            return channel.assertExchange(EXCHANGE_NAME, 'topic', {}).then(function (exchange) {
-                return channel.assertQueue('', {exclusive: true}).then(function (responseQueue) {
-                    channel.consume(responseQueue.queue, responseConsumer);
-                    return [connection, channel, exchange, responseQueue];
-                });
-            });
-        });
+    var connection = amqplib.connect('amqp://localhost');
+    var channel = connection.then(function (connection) {
+        return connection.createChannel();
     });
+    var exchange = channel.then(function (channel) {
+        return channel.assertExchange(EXCHANGE_NAME, 'topic', {});
+    });
+    var queue = channel.then(function (channel) {
+        return channel.assertQueue('', {exclusive: true}).then(function (queue) {
+            channel.consume(queue.queue, responseConsumer);
+            return queue;
+        })
+    });
+    return Promise.all([connection, channel, exchange, queue]);
 }
 
 function getRabbit() {

@@ -16,7 +16,7 @@ Promise.all(promises.map(function(promise) {
     if (inspection.isFulfilled()) {
         console.log('results:', inspection.value());
     } else {
-        console.log('error:', inspection.reason());
+        console.log('error:', inspection.reason().stack);
     }
 }).finally(function() {
     process.exit(0);
