@@ -9,7 +9,7 @@ amqp.connect('amqp://localhost')
                 var ex = 'stevek';
                 ch.assertExchange(ex, 'topic');
                 ch.assertQueue('fib_queue').then(function (q) {
-                    console.log('private q:', q);
+                    console.log('q:', q);
                     ch.bindQueue(q.queue, ex, 'fib');
                     ch.prefetch(1);
                     console.log(' [x] Awaiting RPC requests');

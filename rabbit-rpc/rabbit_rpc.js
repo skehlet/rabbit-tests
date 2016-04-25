@@ -24,7 +24,7 @@ function responseConsumer(message) {
 }
 
 function initRabbit() {
-    logger.debug('establishing rabbit connection, channel, exchange, and responseQueue');
+    logger.debug('Establishing rabbit connection, channel, exchange, and responseQueue');
     var connection = amqplib.connect('amqp://localhost');
     var channel = connection.then(function (connection) {
         return connection.createChannel();
